@@ -21,7 +21,7 @@ contract EthFarm {
     uint256 public openingTime;
     uint256 public closeTime;
 
-    uint256 public stakeAmount = 0.05 * (10**18);
+    uint256 public stakeAmount = 0.5 * (10**18);
 
     // A mapping is a key/value map. Here we store each  stakingBalance.
     mapping(address => bool) public hasStake;
@@ -61,13 +61,13 @@ contract EthFarm {
 
         uint256 currentTime = block.timestamp;
 
-        if(currentTime < openingTime || currentTime > closeTime){
+        if(currentTime > openingTime || currentTime > closeTime){
             revert("please check time to stake");
         }
 
         require(!hasStake[msg.sender], "Can't stake twice");
 
-        require(stakeAmount ==  msg.value, "staking balance must be ");
+        require(stakeAmount ==  msg.value, "incorrect staking balance");
 
         predictedPrices[msg.sender] = predictedPrice;
 
@@ -98,7 +98,7 @@ contract EthFarm {
         }
 
         if(rewardersAddress.length>0){
-            uint rewardAmount = stakeAmount / rewardersAddress.length;
+            uint rewardAmount = (stakeAmount * stakers.length )/ rewardersAddress.length;
             for (uint i=0; i<rewardersAddress.length; i++) {
                 address payable winner = payable(rewardersAddress[i]);
                 winner.transfer(rewardAmount);
@@ -108,11 +108,19 @@ contract EthFarm {
     function contractBalance() public  view returns (uint256){
         return address(this).balance;
     }
-    function setTime(uint256 start, uint256 end) onlyOwner external {
-        require(openingTime >= block.timestamp, "opening time must be greater current time");
-        require(openingTime < closeTime, "close time must be greater than opening time");
 
+    function stakersCount() public  view returns (uint256){
+        return stakers.length;
+    }
+
+    function winnersCount() public  view returns (uint256){
+        return rewardersAddress.length;
+    }
+    function setTime(uint256 start, uint256 end) onlyOwner public {
         openingTime = start;
+        require(openingTime >= block.timestamp, "opening time must be greater current time");
+        require(openingTime < end, "close time must be greater than opening time");
+
         closeTime = end;
 
     }

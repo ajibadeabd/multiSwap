@@ -5,12 +5,15 @@
 
 // We import Chai to use its asserting functions here.
 const { expect } = require("chai");
+const web3 = require("Web3");
 
 // We use `loadFixture` to share common setups (or fixtures) between tests.
 // Using this simplifies your tests and makes them run faster, by taking
 // advantage or Hardhat Network's snapshot functionality.
 const { loadFixture } = require("@nomicfoundation/hardhat-network-helpers");
-
+function tokens(n) {
+  return web3.utils.toWei(n, "ether");
+}
 // `describe` is a Mocha function that allows you to organize your tests.
 // Having your tests organized makes debugging them easier. All Mocha
 // functions are available in the global scope.
@@ -25,7 +28,7 @@ describe(" EthFarm contract", function () {
   async function deployTokenFixture() {
     // Get the ContractFactory and Signers here.
     const EthFarm = await ethers.getContractFactory("EthFarm");
-    const [owner, addr1, addr2] = await ethers.getSigners();
+    const [owner, addr1, addr2, addr3, addr5, addr6, addr7, addr8, addr9] = await ethers.getSigners();
 
     // To deploy our contract, we just have to call Token.deploy() and await
     // for it to be deployed(), which happens onces its transaction has been
@@ -35,7 +38,7 @@ describe(" EthFarm contract", function () {
     await hardhatEthFarm.deployed();
 
     // Fixtures can return anything you consider useful for your tests
-    return { EthFarm, hardhatEthFarm, owner, addr1, addr2 };
+    return { EthFarm, hardhatEthFarm, owner, addr1, addr2,addr3, addr5, addr6, addr7, addr8, addr9 };
   }
 
   // You can nest describe calls to create subsections.
@@ -44,69 +47,92 @@ describe(" EthFarm contract", function () {
     // tests. It receives the test name, and a callback function.
 //
     // If the callback function is async, Mocha will `await` it.
-    it("Should set the right owner", async function () {
+    it("Should set the time for stake owner and allow users to stake with in the stake range", async function () {
       // We use loadFixture to setup our environment, and then assert that
       // things went well
-      const { hardhatEthFarm, owner } = await loadFixture(deployTokenFixture);
+      const { hardhatEthFarm, owner , addr1 ,  addr2,addr3, addr5, addr6 } = await loadFixture(deployTokenFixture);
 
       // Expect receives a value and wraps it in an assertion object. These
       // objects have a lot of utility methods to assert values.
 
       // This test expects the owner variable stored in the contract to be
       // equal to our Signer's owner.
-      console.log(await hardhatEthFarm.contractBalance())
-      expect(await hardhatEthFarm.owner()).to.equal(owner.address);
+      // admin set the time for staking
+
+      await hardhatEthFarm.connect(owner)
+      .setTime(Date.now()+ (1000 * 3),Date.now() + 1000 * 60 * 60 )
+
+ 
+      // six user stake at a time
+      await hardhatEthFarm.connect(addr1).stake(tokens("2000"),{
+        value:tokens("0.5")
+      })
+      await hardhatEthFarm.connect(addr2).stake(tokens("1900"),{
+        value:tokens("0.5")
+      })
+      await hardhatEthFarm.connect(addr3).stake(tokens("1800"),{
+        value:tokens("0.5")
+      })
+      
+      await hardhatEthFarm.connect(addr5).stake(tokens("2300"),{
+        value:tokens("0.5")
+      })
+      await hardhatEthFarm.connect(addr6).stake(tokens("2300"),{
+        value:tokens("0.5")
+      })
+
+      // stake twice and see that it will fail
+      try{ 
+        await hardhatEthFarm.connect(addr1).stake(tokens("2000"),{
+        value:tokens("0.5")
+      }) 
+       } catch(error){
+
+        // user cant stake twice
+      expect(error.message).to.equal("VM Exception while processing transaction: reverted with reason string 'Can't stake twice'")
+
+      }
+      // stakers count will be equal to total amount of stakers which is 1
+      expect(await hardhatEthFarm.stakersCount()).to.equal(5);
+
+      // total amount staked
+      expect(await hardhatEthFarm.contractBalance()).to.equal(tokens("2.5"))
+
+      // reward time
+      await hardhatEthFarm.connect(owner).reward(tokens("2000"))
+
+      expect(await hardhatEthFarm.winnersCount()).to.equal(2)
     });
-
-    // it("Should assign the total supply of tokens to the owner", async function () {
-    //   const { hardhatToken, owner } = await loadFixture(deployTokenFixture);
-    //   const ownerBalance = await hardhatToken.balanceOf(owner.address);
-    //   expect(await hardhatToken.totalSupply()).to.equal(ownerBalance);
-    // });
   });
+  describe("fail when stake is not set  ", function () {
+   
+   
+    it("Should  fail when stake has not started", async function () {
+      const { hardhatEthFarm, owner , addr1 ,  addr2,addr3, addr5, addr6 } = await loadFixture(deployTokenFixture);
+     try  {
+        await hardhatEthFarm.connect(addr1).stake(tokens("2000"),{
+        value:tokens("0.5")
+      })
+    } catch(error){
+       expect(error.message).to.equal("VM Exception while processing transaction: reverted with reason string 'please check time to stake'")
+    }
+    })
+   
+    it("Should  fail when stake wrong amount", async function () {
+      const { hardhatEthFarm, owner , addr1 ,  addr2,addr3, addr5, addr6 } = await loadFixture(deployTokenFixture);
+     try  {
+      await hardhatEthFarm.connect(owner)
+      .setTime(Date.now()+ (1000 * 3),Date.now() + (1000 * 3)+1 )
 
-  // describe("Transactions", function () {
-  //   it("Should transfer tokens between accounts", async function () {
-  //     const { hardhatToken, owner, addr1, addr2 } = await loadFixture(deployTokenFixture);
-  //     // Transfer 50 tokens from owner to addr1
-  //     await expect(hardhatToken.transfer(addr1.address, 50))
-  //       .to.changeTokenBalances(hardhatToken, [owner, addr1], [-50, 50]);
+        await hardhatEthFarm.connect(addr1).stake(tokens("2000"),{
+        value:tokens("0.9")
+      })
+    } catch(error){
+       expect(error.message).to.equal("VM Exception while processing transaction: reverted with reason string 'incorrect staking balance'")
+    }
+    })
 
-      // Transfer 50 tokens from addr1 to addr2
-  //     // We use .connect(signer) to send a transaction from another account
-  //     await expect(hardhatToken.connect(addr1).transfer(addr2.address, 50))
-  //       .to.changeTokenBalances(hardhatToken, [addr1, addr2], [-50, 50]);
-  //   });
 
-  //   it("should emit Transfer events", async function () {
-  //     const { hardhatToken, owner, addr1, addr2 } = await loadFixture(deployTokenFixture);
 
-  //     // Transfer 50 tokens from owner to addr1
-  //     await expect(hardhatToken.transfer(addr1.address, 50))
-  //       .to.emit(hardhatToken, "Transfer").withArgs(owner.address, addr1.address, 50)
-
-  //     // Transfer 50 tokens from addr1 to addr2
-  //     // We use .connect(signer) to send a transaction from another account
-  //     await expect(hardhatToken.connect(addr1).transfer(addr2.address, 50))
-  //       .to.emit(hardhatToken, "Transfer").withArgs(addr1.address, addr2.address, 50)
-  //   });
-
-  //   it("Should fail if sender doesn't have enough tokens", async function () {
-  //     const { hardhatToken, owner, addr1 } = await loadFixture(deployTokenFixture);
-  //     const initialOwnerBalance = await hardhatToken.balanceOf(
-  //       owner.address
-  //     );
-
-  //     // Try to send 1 token from addr1 (0 tokens) to owner (1000 tokens).
-  //     // `require` will evaluate false and revert the transaction.
-  //     await expect(
-  //       hardhatToken.connect(addr1).transfer(owner.address, 1)
-  //     ).to.be.revertedWith("Not enough tokens");
-
-  //     // Owner balance shouldn't have changed.
-  //     expect(await hardhatToken.balanceOf(owner.address)).to.equal(
-  //       initialOwnerBalance
-  //     );
-  //   });
-  // });
+  })
 });
