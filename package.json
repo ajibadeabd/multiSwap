@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "A boilerplate repository to get you started with Hardhat and Ethereum development",
   "scripts": {
-    "test": "hardhat test"
+    "test": "hardhat test",
+    "deploy":"npx hardhat run --network localhost scripts/deploy.js"
   },
   "repository": {
     "type": "git",
@@ -30,6 +31,7 @@
     "solidity-coverage": "^0.7.21"
   },
   "dependencies": {
+    "@chainlink/contracts": "^0.4.1",
     "nvm": "^0.0.4"
   }
 }
