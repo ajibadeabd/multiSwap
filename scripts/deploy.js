@@ -5,6 +5,7 @@ const path = require("path");
 
 async function main() {
   // This is just a convenience check
+  console.log(network.name)
   if (network.name === "hardhat") {
     console.warn(
       "You are trying to deploy a contract to the Hardhat Network, which" +
